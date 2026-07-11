@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>Mi Día</title>
+  <meta name="description" content="Planificador visual del día con timer, rutinas y checklists">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#aeddf8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c2a4d" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Mi Día">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============ VISTA HOY ============ -->
+  <main id="view-today" class="view active">
+    <header class="day-header">
+      <div class="header-chips">
+        <span class="chip" id="streak-chip">🔥 0 días</span>
+        <button class="chip chip-btn" id="btn-mood">🙂 Ánimo</button>
+      </div>
+      <div class="day-header-top">
+        <button class="nav-btn" id="btn-prev-day" aria-label="Día anterior">‹</button>
+        <div class="day-title" id="day-title-wrap">
+          <h1 id="day-title">Hoy</h1>
+          <p id="day-date"></p>
+        </div>
+        <button class="nav-btn" id="btn-next-day" aria-label="Día siguiente">›</button>
+      </div>
+      <button class="focus-pill" id="btn-focus" hidden>
+        <span class="focus-pill-icon">🎯</span>
+        <span class="focus-pill-text" id="focus-pill-text">Entrar en modo enfoque</span>
+        <span class="focus-pill-go">▶</span>
+      </button>
+      <button class="reschedule-pill" id="btn-reschedule" hidden>
+        <span>📥</span>
+        <span id="reschedule-text"></span>
+      </button>
+      <div class="week-strip" id="week-strip"></div>
+    </header>
+
+    <div class="timeline-scroll" id="timeline-scroll">
+      <div class="anytime-section" id="anytime-section" hidden>
+        <div class="anytime-title">🗂 En cualquier momento</div>
+        <div id="anytime-list"></div>
+      </div>
+      <div class="timeline" id="timeline">
+        <div class="hours" id="hours"></div>
+        <div class="tasks-layer" id="tasks-layer"></div>
+        <div class="now-line" id="now-line"><span class="now-dot"></span><span class="now-label" id="now-label"></span></div>
+      </div>
+      <div class="empty-day" id="empty-day" hidden>
+        <div class="empty-emoji">🌤️</div>
+        <p>Nada planificado aún.</p>
+        <p class="empty-sub">Toca <strong>+</strong> para agregar una tarea<br>o aplica una rutina.</p>
+      </div>
+    </div>
+
+    <button class="fab fab-mic" id="btn-capture" aria-label="Dictar tareas">🎤</button>
+    <button class="fab" id="btn-add-task" aria-label="Agregar tarea">+</button>
+  </main>
+
+  <!-- ============ VISTA RUTINAS ============ -->
+  <main id="view-routines" class="view">
+    <header class="day-header">
+      <div class="day-title">
+        <h1>Rutinas</h1>
+        <p>Plantillas reutilizables</p>
+      </div>
+    </header>
+    <div class="routines-list" id="routines-list"></div>
+    <button class="fab" id="btn-add-routine" aria-label="Nueva rutina">+</button>
+  </main>
+
+  <!-- ============ VISTA TO-DO ============ -->
+  <main id="view-todo" class="view">
+    <header class="day-header">
+      <div class="day-title">
+        <h1>To-do</h1>
+        <p>Lo pendiente, sin fecha aún</p>
+      </div>
+    </header>
+    <div class="todo-list" id="todo-list"></div>
+    <button class="fab" id="btn-add-todo" aria-label="Agregar pendiente">+</button>
+  </main>
+
+  <!-- ============ VISTA PROGRESO ============ -->
+  <main id="view-stats" class="view">
+    <header class="day-header">
+      <div class="day-title">
+        <h1>Progreso</h1>
+        <p>Pequeños pasos, progreso constante</p>
+      </div>
+    </header>
+    <div class="stats-list" id="stats-list"></div>
+  </main>
+
+  <!-- ============ TABS ============ -->
+  <nav class="tabbar">
+    <button class="tab" data-view="view-todo"><span class="tab-icon">✅</span>To-do</button>
+    <button class="tab active" data-view="view-today"><span class="tab-icon">📅</span>Hoy</button>
+    <button class="tab" data-view="view-routines"><span class="tab-icon">🔁</span>Rutinas</button>
+    <button class="tab" data-view="view-stats"><span class="tab-icon">📊</span>Progreso</button>
+  </nav>
+
+  <!-- ============ SHEET: DETALLE DE TAREA ============ -->
+  <div class="sheet-backdrop" id="sheet-task-detail" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="task-detail-head">
+        <span class="task-detail-emoji" id="td-emoji"></span>
+        <div class="task-detail-info">
+          <h2 id="td-title"></h2>
+          <p id="td-time"></p>
+        </div>
+      </div>
+      <div class="checklist" id="td-checklist"></div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="td-start-timer">▶ Iniciar timer</button>
+        <button class="btn btn-ghost" id="td-toggle-done">✓ Completar</button>
+      </div>
+      <div class="sheet-actions secondary">
+        <button class="btn btn-ghost small" id="td-edit">✏️ Editar</button>
+        <button class="btn btn-ghost small danger" id="td-delete">🗑 Borrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: FORM TAREA ============ -->
+  <div class="sheet-backdrop" id="sheet-task-form" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="tf-heading">Nueva tarea</h2>
+      <label class="field">
+        <span>Título</span>
+        <input type="text" id="tf-title" placeholder="¿Qué vas a hacer?" maxlength="80">
+      </label>
+      <div class="field-row">
+        <label class="field" id="tf-start-field">
+          <span>Inicio</span>
+          <input type="time" id="tf-start">
+        </label>
+        <label class="field">
+          <span>Duración (min)</span>
+          <input type="number" id="tf-duration" min="5" max="600" step="5" value="30">
+        </label>
+      </div>
+      <label class="toggle-row">
+        <input type="checkbox" id="tf-anytime">
+        <span>Sin hora fija — en cualquier momento del día</span>
+      </label>
+      <label class="field">
+        <span>Repetir</span>
+        <select id="tf-repeat">
+          <option value="none">No se repite</option>
+          <option value="daily">Todos los días</option>
+          <option value="weekly">Cada semana, este día</option>
+        </select>
+      </label>
+      <div class="field">
+        <span>Ícono</span>
+        <div class="emoji-grid" id="tf-emoji-grid"></div>
+      </div>
+      <div class="field">
+        <span>Color</span>
+        <div class="color-grid" id="tf-color-grid"></div>
+      </div>
+      <div class="field">
+        <span>Checklist (opcional)</span>
+        <div id="tf-checklist-items"></div>
+        <button class="btn btn-ghost small" id="tf-add-check">+ Agregar paso</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="tf-save">Guardar</button>
+        <button class="btn btn-ghost" id="tf-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: FORM RUTINA ============ -->
+  <div class="sheet-backdrop" id="sheet-routine-form" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="rf-heading">Nueva rutina</h2>
+      <label class="field">
+        <span>Nombre</span>
+        <input type="text" id="rf-name" placeholder="Ej: Mañana tranquila" maxlength="60">
+      </label>
+      <div class="field">
+        <span>Ícono</span>
+        <div class="emoji-grid" id="rf-emoji-grid"></div>
+      </div>
+      <div class="field">
+        <span>Pasos de la rutina</span>
+        <div id="rf-items"></div>
+        <button class="btn btn-ghost small" id="rf-add-item">+ Agregar paso</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="rf-save">Guardar rutina</button>
+        <button class="btn btn-ghost" id="rf-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: APLICAR RUTINA ============ -->
+  <div class="sheet-backdrop" id="sheet-apply-routine" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="ar-heading">Aplicar rutina</h2>
+      <p class="sheet-sub" id="ar-summary"></p>
+      <label class="field">
+        <span>Empezar a las</span>
+        <input type="time" id="ar-start">
+      </label>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="ar-apply">Agregar al día</button>
+        <button class="btn btn-ghost" id="ar-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: PERSONAJE ============ -->
+  <div class="sheet-backdrop" id="sheet-character" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>🏝️ Tu personaje</h2>
+      <div class="char-preview" id="char-preview"></div>
+      <label class="field">
+        <span>Nombre</span>
+        <input type="text" id="ch-name" placeholder="¿Cómo se llama?" maxlength="20">
+      </label>
+      <div class="field">
+        <span>Tono de piel</span>
+        <div class="color-grid" id="ch-skin"></div>
+      </div>
+      <div class="field">
+        <span>Peinado</span>
+        <div class="emoji-grid" id="ch-hair"></div>
+      </div>
+      <div class="field">
+        <span>Color de pelo</span>
+        <div class="color-grid" id="ch-haircolor"></div>
+      </div>
+      <div class="field">
+        <span>Ojos</span>
+        <div class="emoji-grid" id="ch-eyes"></div>
+      </div>
+      <div class="field">
+        <span>Polera</span>
+        <div class="color-grid" id="ch-shirt"></div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="ch-save">¡Así me gusta!</button>
+        <button class="btn btn-ghost" id="ch-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: NUEVO TO-DO ============ -->
+  <div class="sheet-backdrop" id="sheet-todo-form" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>Nuevo pendiente</h2>
+      <label class="field">
+        <span>¿Qué tienes que hacer?</span>
+        <input type="text" id="todo-title" placeholder="Ej: Terminar la presentación" maxlength="120">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Prioridad</span>
+          <select id="todo-priority">
+            <option value="high">▲ Alta</option>
+            <option value="med" selected>● Media</option>
+            <option value="low">▼ Baja</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Duración (min)</span>
+          <input type="number" id="todo-duration" min="5" max="600" step="5" value="30">
+        </label>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="todo-save">Guardar</button>
+        <button class="btn btn-ghost" id="todo-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: ÁNIMO ============ -->
+  <div class="sheet-backdrop" id="sheet-mood" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>¿Cómo te sientes hoy?</h2>
+      <p class="sheet-sub">Un registro pequeño, sin juicio. Ayuda a ver patrones con el tiempo.</p>
+      <div class="mood-grid" id="mood-grid"></div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: DICTAR / BRAIN DUMP ============ -->
+  <div class="sheet-backdrop" id="sheet-capture" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>🎤 Cuéntame qué tienes que hacer</h2>
+      <p class="sheet-sub">Dilo con tus palabras: "tengo que ordenar la cocina, escribir el informe y llamar al doctor". Yo lo divido en tareas pequeñas.</p>
+      <button class="mic-btn" id="mic-btn" type="button">
+        <span class="mic-icon" id="mic-icon">🎤</span>
+        <span class="mic-label" id="mic-label">Toca para dictar</span>
+      </button>
+      <label class="field">
+        <span>O escríbelo aquí</span>
+        <textarea id="capture-text" rows="4" placeholder="También puedes usar el micrófono del teclado de tu iPhone aquí..."></textarea>
+      </label>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="capture-plan">✨ Dividir en tareas</button>
+        <button class="btn btn-ghost" id="capture-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: VISTA PREVIA DEL PLAN ============ -->
+  <div class="sheet-backdrop" id="sheet-plan" hidden>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>✨ Tu plan, en pasos pequeños</h2>
+      <p class="sheet-sub">Revísalo antes de agregarlo. Puedes quitar lo que no quieras.</p>
+      <div id="plan-list"></div>
+      <label class="field">
+        <span>Empezar a las</span>
+        <input type="time" id="plan-start">
+      </label>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="plan-apply">Agregar al día</button>
+        <button class="btn btn-ghost" id="plan-cancel">Volver</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TIMER OVERLAY ============ -->
+  <div class="timer-overlay" id="timer-overlay" hidden>
+    <button class="timer-close" id="timer-close" aria-label="Cerrar">✕</button>
+    <div class="timer-task">
+      <span class="timer-emoji" id="timer-emoji">⏱</span>
+      <h2 id="timer-title"></h2>
+    </div>
+    <div class="timer-ring-wrap">
+      <svg class="timer-ring" viewBox="0 0 260 260">
+        <circle class="ring-bg" cx="130" cy="130" r="112"/>
+        <circle class="ring-fill" id="ring-fill" cx="130" cy="130" r="112"/>
+      </svg>
+      <div class="timer-remaining" id="timer-remaining">00:00</div>
+    </div>
+    <div class="focus-checklist" id="focus-checklist"></div>
+    <div class="timer-actions">
+      <button class="btn btn-ghost" id="timer-pause">⏸ Pausar</button>
+      <button class="btn btn-primary" id="timer-done">✓ Terminé</button>
+    </div>
+    <div class="focus-next" id="focus-next" hidden>
+      <span class="focus-next-label">Después viene</span>
+      <span class="focus-next-task" id="focus-next-task"></span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
