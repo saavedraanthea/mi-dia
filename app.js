@@ -1437,7 +1437,7 @@ $("plan-apply").addEventListener("click", () => {
 /* ---------- google calendar (solo lectura) ---------- */
 // Pega aquí el ID de cliente OAuth (termina en .apps.googleusercontent.com).
 // Mientras esté vacío, el botón de conectar no se muestra.
-const GCAL_CLIENT_ID = "";
+const GCAL_CLIENT_ID = "505796645595-bgpoe88bere3634ch9si9md6slku956g.apps.googleusercontent.com";
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 
 let gcalToken = null;       // { token, exp }

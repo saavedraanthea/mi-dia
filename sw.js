@@ -1,5 +1,5 @@
 /* Service worker: cache-first para funcionar offline */
-const CACHE = "midia-v14";
+const CACHE = "midia-v15";
 const ASSETS = [
   "./",
   "./index.html",
