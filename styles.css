@@ -1329,6 +1329,65 @@ body {
 .style-opt.selected { border-color: var(--accent); background: var(--accent-soft); }
 
 /* ===== toast ===== */
+/* ===== google calendar ===== */
+.gcal-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  border: 2px solid var(--card-border);
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform .1s;
+}
+.gcal-pill:active { transform: scale(.97); }
+
+.gcal-block {
+  position: absolute;
+  left: 0; right: 0;
+  border-radius: 14px;
+  border: 2px dashed var(--text-soft);
+  background: repeating-linear-gradient(45deg, var(--surface), var(--surface) 8px, var(--surface-2) 8px, var(--surface-2) 16px);
+  padding: 6px 10px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: .85;
+}
+.gcal-block .gcal-title {
+  font-weight: 800;
+  font-size: 0.78rem;
+  color: var(--text);
+  line-height: 1.2;
+}
+.gcal-block .gcal-time {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.gcal-allday {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 2px dashed var(--text-soft);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 9px 12px;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
 /* toast como globo de diálogo de Tom Nook */
 .toast {
   position: fixed;

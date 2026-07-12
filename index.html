@@ -40,16 +40,25 @@
         <span>📥</span>
         <span id="reschedule-text"></span>
       </button>
+      <button class="gcal-pill" id="btn-gcal" hidden>
+        <span>📅</span>
+        <span id="gcal-pill-text">Conectar Google Calendar</span>
+      </button>
       <div class="week-strip" id="week-strip"></div>
     </header>
 
     <div class="timeline-scroll" id="timeline-scroll">
+      <div class="anytime-section" id="gcal-allday-wrap" hidden>
+        <div class="anytime-title">📅 Todo el día (Google Calendar)</div>
+        <div id="gcal-allday-list"></div>
+      </div>
       <div class="anytime-section" id="anytime-section" hidden>
         <div class="anytime-title">🗂 En cualquier momento</div>
         <div id="anytime-list"></div>
       </div>
       <div class="timeline" id="timeline">
         <div class="hours" id="hours"></div>
+        <div class="tasks-layer" id="gcal-layer" style="z-index:0"></div>
         <div class="tasks-layer" id="tasks-layer"></div>
         <div class="now-line" id="now-line"><span class="now-dot"></span><span class="now-label" id="now-label"></span></div>
       </div>

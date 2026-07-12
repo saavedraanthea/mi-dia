@@ -181,6 +181,8 @@ function renderTimeline() {
   }
   updateNowLine();
   updateFocusPill();
+  updateGcalPill();
+  renderGcal();
 }
 
 /* ---------- modo enfoque ---------- */
@@ -1431,6 +1433,141 @@ $("plan-apply").addEventListener("click", () => {
   renderTimeline();
   toast(`${chosen.length} tarea${chosen.length > 1 ? "s" : ""} agregada${chosen.length > 1 ? "s" : ""} ✨`);
 });
+
+/* ---------- google calendar (solo lectura) ---------- */
+// Pega aquí el ID de cliente OAuth (termina en .apps.googleusercontent.com).
+// Mientras esté vacío, el botón de conectar no se muestra.
+const GCAL_CLIENT_ID = "";
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+
+let gcalToken = null;       // { token, exp }
+let gcalTokenClient = null;
+let gcalCache = {};         // dkey -> eventos
+
+try { gcalToken = JSON.parse(localStorage.getItem("midia-gcal-token")); } catch (e) {}
+const gcalValid = () => gcalToken && Date.now() < gcalToken.exp;
+
+function loadGIS() {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = res;
+    s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+function gcalConnect(interactive) {
+  if (!GCAL_CLIENT_ID) return;
+  loadGIS().then(() => {
+    if (!gcalTokenClient) {
+      gcalTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GCAL_CLIENT_ID,
+        scope: GCAL_SCOPE,
+        callback: (resp) => {
+          if (resp && resp.access_token) {
+            gcalToken = { token: resp.access_token, exp: Date.now() + (resp.expires_in - 90) * 1000 };
+            localStorage.setItem("midia-gcal-token", JSON.stringify(gcalToken));
+            localStorage.setItem("midia-gcal-connected", "1");
+            gcalCache = {};
+            updateGcalPill();
+            renderGcal();
+            toast("Google Calendar conectado 📅");
+          }
+        },
+      });
+    }
+    gcalTokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
+  }).catch(() => { if (interactive) toast("No pude cargar Google. ¿Tienes internet?"); });
+}
+
+$("btn-gcal").addEventListener("click", () => gcalConnect(true));
+
+function updateGcalPill() {
+  const pill = $("btn-gcal");
+  if (!GCAL_CLIENT_ID) { pill.hidden = true; return; }
+  pill.hidden = gcalValid();
+  $("gcal-pill-text").textContent = localStorage.getItem("midia-gcal-connected") === "1"
+    ? "Reconectar Google Calendar"
+    : "Conectar Google Calendar";
+}
+
+async function fetchGcalEvents(dkey) {
+  if (gcalCache[dkey]) return gcalCache[dkey];
+  if (!gcalValid()) return null;
+  const timeMin = new Date(dkey + "T00:00:00").toISOString();
+  const timeMax = new Date(dkey + "T23:59:59").toISOString();
+  const url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    + "?singleEvents=true&orderBy=startTime&maxResults=50"
+    + "&timeMin=" + encodeURIComponent(timeMin)
+    + "&timeMax=" + encodeURIComponent(timeMax);
+  try {
+    const r = await fetch(url, { headers: { Authorization: "Bearer " + gcalToken.token } });
+    if (r.status === 401 || r.status === 403) {
+      localStorage.removeItem("midia-gcal-token");
+      gcalToken = null;
+      updateGcalPill();
+      return null;
+    }
+    const j = await r.json();
+    const evs = (j.items || [])
+      .filter((e) => e.status !== "cancelled")
+      .map((e) => {
+        const allDay = !!(e.start && e.start.date);
+        let startMin = 0, endMin = 0;
+        if (!allDay) {
+          const s = new Date(e.start.dateTime);
+          const en = new Date(e.end.dateTime);
+          startMin = s.getHours() * 60 + s.getMinutes();
+          endMin = en.getHours() * 60 + en.getMinutes();
+          if (endMin <= startMin) endMin = startMin + 30;
+        }
+        return { title: e.summary || "(sin título)", allDay, startMin, endMin };
+      });
+    gcalCache[dkey] = evs;
+    return evs;
+  } catch (e) { return null; } // sin internet: silencio, la app sigue igual
+}
+
+async function renderGcal() {
+  const dkey = dateKey(currentDate);
+  const layer = $("gcal-layer");
+  const alldayWrap = $("gcal-allday-wrap");
+  const alldayList = $("gcal-allday-list");
+  layer.innerHTML = "";
+  alldayList.innerHTML = "";
+  alldayWrap.hidden = true;
+  const evs = await fetchGcalEvents(dkey);
+  if (!evs || dkey !== dateKey(currentDate)) return; // cambió el día mientras cargaba
+  const allday = evs.filter((e) => e.allDay);
+  const timed = evs.filter((e) => !e.allDay);
+  if (allday.length) {
+    alldayWrap.hidden = false;
+    allday.forEach((e) => {
+      const div = document.createElement("div");
+      div.className = "gcal-allday";
+      div.innerHTML = `<span>📅</span><span>${escapeHtml(e.title)}</span>`;
+      alldayList.appendChild(div);
+    });
+  }
+  timed.forEach((e) => {
+    const top = (e.startMin / 60) * HOUR_H;
+    const height = Math.max(((e.endMin - e.startMin) / 60) * HOUR_H, 30);
+    const div = document.createElement("div");
+    div.className = "gcal-block";
+    div.style.top = `${top}px`;
+    div.style.height = `${height}px`;
+    div.innerHTML = `<div class="gcal-title">📅 ${escapeHtml(e.title)}</div>
+      <div class="gcal-time">${toHHMM(e.startMin)} – ${toHHMM(e.endMin)}</div>`;
+    layer.appendChild(div);
+  });
+}
+
+// intento silencioso al abrir si ya estuvo conectada y el token venció
+if (GCAL_CLIENT_ID && localStorage.getItem("midia-gcal-connected") === "1" && !gcalValid() && navigator.onLine) {
+  setTimeout(() => gcalConnect(false), 1200);
+}
 
 /* ---------- init ---------- */
 load();
