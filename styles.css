@@ -74,6 +74,15 @@ body {
   color: var(--text);
   overflow: hidden;
   overscroll-behavior: none;
+  /* fija la página en iOS: sin arrastre lateral ni rebote del cuerpo */
+  position: fixed;
+  inset: 0;
+  width: 100%;
+}
+
+.timeline-scroll, .stats-list, .routines-list, .todo-list {
+  overflow-x: hidden;
+  touch-action: pan-y;
 }
 
 /* ===== vistas ===== */
@@ -1113,20 +1122,23 @@ body {
 .bar-label { font-size: 0.62rem; font-weight: 800; color: var(--text-soft); text-transform: uppercase; }
 .bar-count { font-size: 0.68rem; font-weight: 800; }
 
-.mood-history { display: flex; justify-content: space-between; gap: 6px; }
+.mood-history { display: flex; justify-content: space-between; gap: 3px; }
 .mood-day {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
 }
 .mood-day-emoji {
-  font-size: 1.4rem;
+  font-size: 1.15rem;
   background: var(--surface-2);
   border: 1.5px solid var(--card-border);
   border-radius: 50%;
-  width: 42px; height: 42px;
+  width: 100%;
+  max-width: 38px;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
