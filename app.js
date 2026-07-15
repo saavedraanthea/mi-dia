@@ -1256,6 +1256,28 @@ function extractDuration(text) {
   return { dur, text: t };
 }
 
+// verbos que suelen INICIAR una tarea nueva en dictado sin comas
+const VERB_SET = new Set(["ordenar","limpiar","escribir","llamar","comprar","estudiar","preparar","revisar","enviar","mandar","pagar","sacar","lavar","cocinar","terminar","leer","responder","agendar","organizar","planchar","regar","hacer","entrenar","caminar","buscar","llevar","recoger","arreglar","tomar","avanzar","redactar","barrer","aspirar"]);
+// si la palabra anterior es una de estas, el verbo NO inicia tarea nueva ("tengo que hacer", "ir a comprar")
+const NO_SPLIT_PREV = new Set(["a","de","para","que","y","e","o","al","del","no","me","te","se","lo","la","voy","tengo","debo","necesito","quiero","puedo","hay"]);
+
+function splitByVerbs(s) {
+  const words = s.split(/\s+/);
+  const out = [];
+  let cur = [];
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i].toLowerCase().replace(/[^a-záéíóúñü]/g, "");
+    const prev = i > 0 ? words[i - 1].toLowerCase().replace(/[^a-záéíóúñü]/g, "") : "";
+    if (i > 0 && cur.length >= 2 && VERB_SET.has(w) && !NO_SPLIT_PREV.has(prev)) {
+      out.push(cur.join(" "));
+      cur = [];
+    }
+    cur.push(words[i]);
+  }
+  if (cur.length) out.push(cur.join(" "));
+  return out;
+}
+
 function splitIntoTaskPhrases(raw) {
   // separadores fuertes primero
   let parts = raw.split(/\s*(?:,|;|\.|\n|y luego\b|y después\b|después\b|luego\b|también tengo que\b|también\b|además\b)\s*/i);
@@ -1272,7 +1294,10 @@ function splitIntoTaskPhrases(raw) {
     }
     out.push(rest);
   }
-  return out.map((s) => s.trim()).filter((s) => s.length > 2);
+  // dictado sin comas: cortar donde aparece un verbo de tarea nuevo
+  const final = [];
+  for (const p of out) final.push(...splitByVerbs(p));
+  return final.map((s) => s.trim()).filter((s) => s.length > 2);
 }
 
 function cleanTaskTitle(s) {
@@ -1321,6 +1346,9 @@ $("btn-capture").addEventListener("click", () => {
 });
 $("capture-cancel").addEventListener("click", () => { stopListening(); closeSheet("sheet-capture"); });
 
+let micFinals = {};      // índice → texto final (evita duplicados de iOS)
+let micTimeout = null;   // tope de seguridad
+
 function setupRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
@@ -1329,13 +1357,14 @@ function setupRecognition() {
   rec.continuous = true;
   rec.interimResults = true;
   rec.onresult = (e) => {
-    let final = "";
+    // iOS repite resultados finales: guardarlos por índice los deduplica
     let interim = "";
-    for (let i = 0; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript + " ";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) micFinals[i] = e.results[i][0].transcript;
       else interim += e.results[i][0].transcript;
     }
-    $("capture-text").value = (final + interim).trim();
+    const final = Object.keys(micFinals).sort((a, b) => a - b).map((k) => micFinals[k]).join(" ");
+    $("capture-text").value = (final + " " + interim).replace(/\s+/g, " ").trim();
   };
   rec.onend = () => { if (listening) stopListening(); };
   rec.onerror = () => {
@@ -1347,7 +1376,12 @@ function setupRecognition() {
 
 function stopListening() {
   listening = false;
-  if (recognition) { try { recognition.stop(); } catch (e) {} }
+  clearTimeout(micTimeout);
+  if (recognition) {
+    try { recognition.abort(); } catch (e) {
+      try { recognition.stop(); } catch (e2) {}
+    }
+  }
   $("mic-btn").classList.remove("listening");
   $("mic-icon").textContent = "🎤";
   $("mic-label").textContent = "Toca para dictar";
@@ -1362,11 +1396,15 @@ $("mic-btn").addEventListener("click", () => {
     return;
   }
   try {
+    micFinals = {};
     recognition.start();
     listening = true;
     $("mic-btn").classList.add("listening");
     $("mic-icon").textContent = "🔴";
     $("mic-label").textContent = "Escuchando... toca para parar";
+    // tope de seguridad: nunca escuchar más de 60 s seguidos
+    clearTimeout(micTimeout);
+    micTimeout = setTimeout(() => { if (listening) { stopListening(); toast("Listo 🎤 revisa el texto y divide"); } }, 60000);
   } catch (e) {
     stopListening();
   }
@@ -1438,7 +1476,8 @@ $("plan-apply").addEventListener("click", () => {
 // Pega aquí el ID de cliente OAuth (termina en .apps.googleusercontent.com).
 // Mientras esté vacío, el botón de conectar no se muestra.
 const GCAL_CLIENT_ID = "505796645595-bgpoe88bere3634ch9si9md6slku956g.apps.googleusercontent.com";
-const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+// events = leer eventos + crear recordatorios (la app nunca borra ni toca otros eventos)
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
 let gcalToken = null;       // { token, exp }
 let gcalTokenClient = null;
@@ -1478,7 +1517,9 @@ function gcalConnect(interactive) {
         },
       });
     }
-    gcalTokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
+    // si ya se conectó antes, reconectar sin pantallas (un toque y listo)
+    const yaConectada = localStorage.getItem("midia-gcal-connected") === "1";
+    gcalTokenClient.requestAccessToken({ prompt: interactive && !yaConectada ? "consent" : "" });
   }).catch(() => { if (interactive) toast("No pude cargar Google. ¿Tienes internet?"); });
 }
 
@@ -1563,6 +1604,58 @@ async function renderGcal() {
     layer.appendChild(div);
   });
 }
+
+/* --- recordatorios: enviar tareas de hoy a Google Calendar con alarma --- */
+async function sendRemindersToCalendar() {
+  if (!GCAL_CLIENT_ID) return;
+  if (!gcalValid()) {
+    gcalConnect(true);
+    toast("Conectando con Google... toca 🔔 de nuevo en un momento");
+    return;
+  }
+  const dkey = dateKey(currentDate);
+  if (!data.gcalPushed) data.gcalPushed = {};
+  if (!data.gcalPushed[dkey]) data.gcalPushed[dkey] = {};
+  const pushed = data.gcalPushed[dkey];
+  const tasks = tasksFor(dkey).filter((t) => !t.done && !t.anytime && !pushed[t.id]);
+  if (!tasks.length) { toast("Nada nuevo que recordar 🙂"); return; }
+  let ok = 0;
+  for (const t of tasks) {
+    const startDate = new Date(dkey + "T" + t.start + ":00");
+    const body = {
+      summary: `${t.emoji} ${t.title}`,
+      description: "Creado por Mi Día 🏝️",
+      start: { dateTime: startDate.toISOString() },
+      end: { dateTime: new Date(startDate.getTime() + t.duration * 60000).toISOString() },
+      reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 5 }, { method: "popup", minutes: 0 }] },
+    };
+    try {
+      const r = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + gcalToken.token, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.status === 401 || r.status === 403) {
+        localStorage.removeItem("midia-gcal-token");
+        gcalToken = null;
+        updateGcalPill();
+        toast("Permiso vencido: toca conectar y reintenta 🔄");
+        return;
+      }
+      if (r.ok) {
+        const j = await r.json();
+        pushed[t.id] = j.id;
+        ok++;
+      }
+    } catch (e) { toast("Sin internet 😕 inténtalo más tarde"); break; }
+  }
+  save();
+  gcalCache = {};
+  renderGcal();
+  if (ok) toast(`🔔 ${ok} recordatorio${ok > 1 ? "s" : ""} creado${ok > 1 ? "s" : ""} en tu Calendar`);
+}
+
+$("btn-remind").addEventListener("click", sendRemindersToCalendar);
 
 // intento silencioso al abrir si ya estuvo conectada y el token venció
 if (GCAL_CLIENT_ID && localStorage.getItem("midia-gcal-connected") === "1" && !gcalValid() && navigator.onLine) {
